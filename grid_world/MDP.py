@@ -123,6 +123,7 @@ class GridWorldMDP:
                 self.values[i] = v
 
     def show_values(self, save=None, slip=0):
+
         grid = self.map
         for state in self.state_loc_map:
             grid[*self.state_loc_map[state]] = self.values[state]
@@ -151,6 +152,7 @@ gamma:{self.gamma}, slip probability:{slip}''')
         plt.close()
 
     def show_policy(self, save=None, slip=0):
+
         plt.imshow(self.map.T)
         plt.title(f'''Policy solving GridWorld problem
 gamma:{self.gamma}, slip probability:{slip}''')
