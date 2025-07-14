@@ -4,7 +4,9 @@ import random
 
 GAME_VEL = 1
 PIPE_LEN = 512
+PIPE_WIDTH = 16
 CLEARANCE = 64
+BIRD_SIZE = (16, 12)
 
 
 class Pipes:
@@ -28,20 +30,37 @@ class Pipes:
             new_pipe.initialize_interface(self.window, self.assets)
         self.pipe_list.append(new_pipe)
 
-    def update(self):
+    def update(self) -> int:
+        score: int = 0
         for pipe in self.pipe_list:
             if not pipe.update():
                 self.pipe_list.remove(pipe)
+            if not self.window_size[0] // 4 - PIPE_WIDTH < pipe.x:
+                score += pipe.worth
+                pipe.worth = 0
+        return score
 
     def render(self):
         for pipe in self.pipe_list:
             pipe.render()
+
+    def check_collision(self, bird_altitude: int):
+        for pipe in self.pipe_list:
+            right_clearance = self.window_size[0] // 4 - PIPE_WIDTH < pipe.x
+            left_clearance = pipe.x < self.window_size[0] // 4 + BIRD_SIZE[0]
+            if left_clearance and right_clearance:
+                if pipe.height < bird_altitude + BIRD_SIZE[1]:
+                    return True
+                elif pipe.height - CLEARANCE > bird_altitude:
+                    return True
+        return False
 
 
 class Pipe:
 
     def __init__(self, window_size: tuple[int, int]) -> None:
         self.x: int = window_size[1]
+        self.worth = 1
         self.height: int = random.randint(
             window_size[0]//4,
             3*window_size[0]//4 + CLEARANCE
@@ -64,4 +83,7 @@ class Pipe:
 
     def render(self):
         self.assets.render(self.window, (self.x, self.height))
-        self.assets.render(self.window, (self.x, self.height - PIPE_LEN - CLEARANCE))
+        self.assets.render(
+            self.window,
+            (self.x, self.height - PIPE_LEN - CLEARANCE)
+        )

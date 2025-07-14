@@ -12,17 +12,24 @@ SKY_BLUE = (207, 236, 247)
 class Game:
 
     def __init__(self) -> None:
-        self.bird: Bird = Bird()
+        self.bird: Bird = Bird(WINDOW_SIZE)
         self.pipes: Pipes = Pipes(WINDOW_SIZE)
 
     def initialize_pygame(self):
         pg.init()
+        pg.display.set_caption('Flappy bird')
         self.screen = pg.display.set_mode(SCREEN_SIZE)
         self.window = pg.Surface(WINDOW_SIZE)
         self.clock = pg.time.Clock()
         self.assets = {
             'bird': Animation(load_images('./assets/images/bird')),
-            'pipe': Animation([load_image('assets/images/pipe/pipe.png')]),
+            'pipe': Animation([load_image('./assets/images/pipe/pipe.png')]),
+            'title': Animation(
+                [load_image('./assets/images/title/title.png')]
+            ),
+            'title_anim': Animation(
+                load_images('./assets/images/title/title_anim')
+            ),
         }
         self.bird.initialize_interface(self.window, self.assets['bird'])
         self.pipes.initialize_interface(self.window, self.assets['pipe'])
@@ -30,8 +37,13 @@ class Game:
     def play(self):
         self.initialize_pygame()
         ctr = 0
+        score = 0
+        print('\n')
+        print(' GAME START '.center(40, '*'))
+        print('\n'*1)
+        print('\033[?25l', end="")
+        print(' '*15 + 'score : 00', end='', flush=True)
         while True:
-            # print(self.bird.altitude)
             self.window.fill(SKY_BLUE)
             for event in pg.event.get():
 
@@ -44,20 +56,33 @@ class Game:
                     if event.key == pg.K_SPACE:
                         self.bird.flap()
 
-            if ctr > 120:
-                ctr = 0
-                print('pipe spawned')
-                print(self.pipes.pipe_list)
+            if ctr % 120 == 0:
                 self.pipes.spawn_pipe()
-                print(self.pipes.pipe_list)
             ctr += 1
             self.bird.progress()
             self.bird.render()
-            self.pipes.update()
+            if self.pipes.check_collision(int(self.bird.altitude)):
+                return
+            if self.bird.out_of_window():
+                return
+            score += self.pipes.update()
             self.pipes.render()
+            self.bird.update_anim()
+            if ctr < 120:
+                self.assets['title'].render(self.window, (0, 0))
+                self.assets['title_anim'].render(self.window, (0, 0))
+                self.bird.altitude = self.window.get_height() // 2
+                self.bird.fall_vel = 0
+                self.assets['title_anim'].update()
             self.screen.blit(pg.transform.scale(self.window, SCREEN_SIZE))
             pg.display.update()
+            print('\b\b', end='', flush=True)
+            print(f'{score}'.rjust(2, '0'), end='', flush=True)
             self.clock.tick(60)
 
 
-Game().play()
+g = Game()
+g.play()
+print('\n')
+print(' GAME OVER '.center(40, '*'))
+print('\033[?25h', end="")
