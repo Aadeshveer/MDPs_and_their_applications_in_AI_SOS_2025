@@ -10,17 +10,20 @@ SCALE = 1
 class Bird:
 
     def __init__(self, window_size: tuple[int, int]) -> None:
-        self.altitude: float = 0
+        self.altitude: float = window_size[1] / 2
         self.fall_vel: float = 0
+        self.interface: bool = False
         self.window_size = window_size
 
     def flap(self):
         self.fall_vel = -MAX_UP_VEL
-        self.assets.update(2)
+        if self.interface:
+            self.assets.update(2)
 
     def progress(self):
         self.altitude += self.fall_vel * SCALE
         self.fall_vel += GRAVITY
+        self.fall_vel = min(self.fall_vel, MAX_UP_VEL*2)
 
     def update_anim(self):
         if self.fall_vel > MAX_UP_VEL/2:
@@ -33,6 +36,7 @@ class Bird:
         window: pg.Surface,
         assets: Animation,
     ):
+        self.interface = True
         self.window = window
         self.assets = assets
 

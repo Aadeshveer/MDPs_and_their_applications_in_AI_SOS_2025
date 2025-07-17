@@ -1,12 +1,15 @@
 import pygame as pg
 import sys
-from bird import Bird
-from env import Pipes
+from bird import Bird, BIRD_SIZE, MAX_UP_VEL
+from env import Pipes, Pipe, CLEARANCE, GAME_VEL
 from utils import load_image, load_images, Animation
+from agent import Agent, State, MemoryPoint
+from plotter import Plotter
 
 WINDOW_SIZE = (300, 400)
 SCREEN_SIZE = (600, 800)
 SKY_BLUE = (207, 236, 247)
+FPS = 60
 
 
 class Game:
@@ -14,6 +17,14 @@ class Game:
     def __init__(self) -> None:
         self.bird: Bird = Bird(WINDOW_SIZE)
         self.pipes: Pipes = Pipes(WINDOW_SIZE)
+
+    def initialize_AI(self):
+        self.agent = Agent()
+        self.plotter = Plotter()
+
+    def reset(self):
+        self.bird = Bird(WINDOW_SIZE)
+        self.pipes = Pipes(WINDOW_SIZE)
 
     def initialize_pygame(self):
         pg.init()
@@ -62,9 +73,9 @@ class Game:
             self.bird.progress()
             self.bird.render()
             if self.pipes.check_collision(int(self.bird.altitude)):
-                return
+                break
             if self.bird.out_of_window():
-                return
+                break
             score += self.pipes.update()
             self.pipes.render()
             self.bird.update_anim()
@@ -78,11 +89,113 @@ class Game:
             pg.display.update()
             print('\b\b', end='', flush=True)
             print(f'{score}'.rjust(2, '0'), end='', flush=True)
-            self.clock.tick(60)
+            self.clock.tick(FPS)
+        print('\n')
+        print(' GAME OVER '.center(40, '*'))
+        print('\033[?25h', end="")
+
+    def get_state(self) -> State:
+        closest_next_pipe: Pipe = self.pipes.get_next_pipe()
+        return State(
+            (self.bird.altitude - closest_next_pipe.height + BIRD_SIZE[1]/2 + CLEARANCE/2)/WINDOW_SIZE[1],  # Noqa:E501
+            self.bird.fall_vel/MAX_UP_VEL,
+            closest_next_pipe.x/(GAME_VEL*FPS*2),
+            (self.bird.altitude + BIRD_SIZE[1]/2)/WINDOW_SIZE[1],
+        )
+
+    def AI_game(self, interface: bool = False):
+        score = 0
+        n = 0
+        if interface:
+            self.initialize_pygame()
+        print('getting ai')
+        self.initialize_AI()
+        print('begining')
+        while True:
+            n += 1
+            if n % 100 == 0:
+                self.plotter.plot('performance.png')
+            done = False
+            score = 0
+            self.reset()
+            if interface:
+                self.bird.initialize_interface(
+                    self.window, self.assets['bird']
+                )
+                self.pipes.initialize_interface(
+                    self.window, self.assets['pipe']
+                )
+            ctr = 0
+            while not done:
+                if ctr % 120 == 0:
+                    self.pipes.spawn_pipe()
+
+                if interface:
+                    self.window.fill(SKY_BLUE)
+                    for event in pg.event.get():
+                        if event.type is pg.QUIT:
+                            pg.quit()
+                            sys.exit()
+
+                ctr += 1
+                done = False
+                state = self.get_state()
+                action = self.agent.choose_action(state)
+                result = self.iterate(action)
+                match result:
+                    case -1:
+                        reward = -5
+                        done = True
+                    case 1:
+                        score += result
+                        reward = 10
+                    case 0:
+                        reward = 0
+                    case -2:
+                        reward = -20
+                        done = True
+                    case _:
+                        raise ValueError(f'result given by iterate method is faulty: {result}')  # Noqa:E501
+                memory = MemoryPoint(
+                    state,
+                    action,
+                    reward,
+                    self.get_state(),
+                    done
+                )
+                self.agent.train_one_data(memory)
+                self.agent.add_to_memory(memory)
+
+                if interface:
+                    self.bird.render()
+                    self.pipes.render()
+                    self.bird.update_anim()
+                    self.screen.blit(
+                        pg.transform.scale(self.window, SCREEN_SIZE)
+                    )
+                    pg.display.update()
+
+                if done:
+                    break
+            self.agent.train_multiple_data()
+            print(f'{n}. score: {score}, iterations: {ctr}')
+            if ctr >= 1000:
+                self.agent.model.save('model.pth')
+                break
+            self.plotter.add_score(score, ctr)
+
+    def iterate(self, action: bool) -> int:
+        if action:
+            self.bird.flap()
+        self.bird.progress()
+        if self.pipes.check_collision(int(self.bird.altitude)):
+            return -1
+        if self.bird.out_of_window():
+            return -2
+        score_update = self.pipes.update()
+        return score_update
 
 
-g = Game()
-g.play()
-print('\n')
-print(' GAME OVER '.center(40, '*'))
-print('\033[?25h', end="")
+if __name__ == '__main__':
+    game = Game()
+    game.AI_game()
