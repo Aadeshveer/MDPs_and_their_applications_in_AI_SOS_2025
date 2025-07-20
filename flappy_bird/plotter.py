@@ -59,7 +59,8 @@ class Plotter:
         plt.ylabel('num of times arrived on')
         plt.xlabel('episode length')
         plt.title('Episode length')
-        plt.plot(self.iter_ctr[:self.limit], np.arange(self.limit), label='num of iterations')
+        plt.plot(np.arange(self.limit), self.iter_ctr[:self.limit], label='num of iterations')
+        plt.set_yscale('log')
 
         plt.tight_layout()
         if file_name is None:

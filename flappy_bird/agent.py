@@ -4,15 +4,15 @@ import random
 from collections import deque
 from model import NeuralNet, QLearning
 
-MAX_MEMORY = 100_000
+MAX_MEMORY = 1_000_000
 MIN_EPSILON = 0.001
-EPSILON_DECAY = 0.995
-BATCH_SIZE = 1000
-LR = 0.0001
-EPSILON = 1
+EPSILON_DECAY = 1
+BATCH_SIZE = 128
+LR = 0.001
+EPSILON = 0.001
 GAMMA = 0.99
 HIDDEN_SIZE = 128
-INPUT_SIZE = 4  # to accomodate State
+INPUT_SIZE = 6  # to accomodate State
 OUTPUT_SIZE = 2  # idx 0 for no flap and 1 for flap
 
 
@@ -20,22 +20,28 @@ class State:
 
     def __init__(
         self,
-        alt_diff: float,
+        up_alt_diff: float,
+        down_alt_diff: float,
+        bird_alt_top: float,
+        bird_alt_down: float,
         bird_vel: float,
         pipe_dist: float,
-        bird_alt: float
     ) -> None:
-        self.alt_diff = alt_diff
+        self.up_alt_diff = up_alt_diff
+        self.down_alt_diff = down_alt_diff
+        self.bird_alt_top = bird_alt_top
+        self.bird_alt_down = bird_alt_down
         self.bird_vel = bird_vel
         self.pipe_dist = pipe_dist
-        self.bird_alt = bird_alt
 
     def to_tensor(self) -> torch.Tensor:
         return torch.tensor((
-            self.alt_diff,
+            self.up_alt_diff,
+            self.down_alt_diff,
+            self.bird_alt_top,
+            self.bird_alt_down,
             self.bird_vel,
             self.pipe_dist,
-            self.bird_alt
         ), dtype=torch.float32)
 
 
@@ -78,7 +84,13 @@ class Agent:
         self.epsilon = EPSILON
         self.memory: deque[MemoryPoint] = deque(maxlen=MAX_MEMORY)
         self.model = NeuralNet(INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE)
-        self.trainer = QLearning(self.model, LR, GAMMA)
+        # self.model.load('model.pth')
+        self.target_model = NeuralNet(INPUT_SIZE, HIDDEN_SIZE, OUTPUT_SIZE)
+        self.update_target_model()
+        self.trainer = QLearning(self.model, self.target_model, LR, GAMMA)
+
+    def update_target_model(self):
+        self.target_model.load_state_dict(self.model.state_dict())
 
     def choose_action(self, state: State):
         if random.random() > self.epsilon:
