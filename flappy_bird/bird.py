@@ -1,7 +1,7 @@
 import pygame as pg
 from utils import Animation
 
-BIRD_SIZE = (16, 12)
+BIRD_SIZE = (0, 12)
 MAX_UP_VEL = 3
 GRAVITY = 0.15
 SCALE = 1
